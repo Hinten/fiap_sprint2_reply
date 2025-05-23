@@ -8,7 +8,7 @@ from datetime import datetime
 def main():
     """Função teste do programa."""
     configurar_logger()
-    iniciar_database()
+    Database.init_sqlite()
     Database.create_all_tables(drop_if_exists=False)
     ddl = Database.generate_ddl()
 

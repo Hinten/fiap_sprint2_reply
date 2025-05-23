@@ -1,10 +1,11 @@
 from contextlib import contextmanager
 from io import StringIO
-
+from typing import Optional
 from sqlalchemy import create_engine, Engine, MetaData
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
 import json
+import os
 
 from sqlalchemy.sql.ddl import CreateTable
 
@@ -16,6 +17,26 @@ class Database:
 
     engine:Engine
     session:sessionmaker
+
+    @staticmethod
+    def init_sqlite(path:Optional[str] = None):
+        """
+        Inicializa a conexão com o banco de dados SQLite.
+        :param path: Caminho do banco de dados SQLite.
+        :return:
+        """
+
+        if path is None:
+            path = os.path.join(os.getcwd(), "database.db")
+
+        # Cria o engine de conexão
+        engine = create_engine(f"sqlite:///{path}", echo=SQL_ALCHEMY_DEBUG)
+
+        # Testa a conexão
+        with engine.connect() as _:
+            print(f"Conexão bem-sucedida ao banco de dados SQLite!\n Path: {path}")
+        Database.engine = engine
+        Database.session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
     @staticmethod
     def init_oracledb(user:str, password:str, dsn:str=DEFAULT_DSN):

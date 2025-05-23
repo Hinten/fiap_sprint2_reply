@@ -48,3 +48,15 @@ def login_view():
             except Exception as e:
                 logging.error(f"Erro ao conectar ao banco de dados: {e}")
                 st.error(f"Erro ao conectar ao banco de dados: {e}")
+
+def login_sqlite():
+    """
+    Função para armazenar em cache as credenciais de login.
+    :return:
+    """
+    if not st.session_state.get('logged_in', False):
+        Database.init_sqlite()
+        st.session_state.logged_in = True
+        st.session_state.engine = Database.engine
+        st.session_state.session = Database.session
+        st.rerun()

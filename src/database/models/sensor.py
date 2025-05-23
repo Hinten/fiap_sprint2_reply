@@ -2,8 +2,6 @@ from enum import StrEnum
 from typing import List
 from sqlalchemy import Sequence, String, Text, ForeignKey, Float, DateTime, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from src.database.models.fazenda import Plantio
-from src.database.models.unidade import Unidade
 from src.database.tipos_base.database import Database
 from src.database.tipos_base.model import Model
 from datetime import datetime, date, time, timedelta
@@ -109,17 +107,6 @@ class Sensor(Model):
 
     tipo_sensor: Mapped[TipoSensor] = relationship('TipoSensor', back_populates='sensors')
 
-    plantio_id: Mapped[int] = mapped_column(
-        ForeignKey('PLANTIO.id'),
-        nullable=True,
-        info={
-            'label': 'Plantio'
-        },
-        comment="ID do plantio associado"
-    )
-
-    plantio: Mapped[Plantio] = relationship('Plantio', back_populates='sensores')
-
     nome: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
@@ -150,17 +137,6 @@ class Sensor(Model):
         comment="Data de instalação do sensor"
     )
 
-    unidade_id: Mapped[int] = mapped_column(
-        ForeignKey('UNIDADE.id'),
-        nullable=True,
-        info={
-            'label': 'Unidade'
-        },
-        comment="ID da unidade de medida associada"
-    )
-
-    unidade: Mapped[Unidade] = relationship('Unidade', back_populates='sensors')
-
     latitude: Mapped[float] = mapped_column(
         Float,
         nullable=True,
@@ -183,8 +159,6 @@ class Sensor(Model):
 
 
     leituras: Mapped[list['LeituraSensor']] = relationship('LeituraSensor', back_populates='sensor')
-
-    irrigacoes: Mapped[list['Irrigacao']] = relationship('Irrigacao', back_populates='sensor')
 
     def __str__(self):
         return f"{self.id} - {self.nome}"

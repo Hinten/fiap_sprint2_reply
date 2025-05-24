@@ -1,4 +1,4 @@
-from src.dashboard.main import main as main_dashboard
+from src.dashboard.main import main as dashboard_main
 
 
 def main():
@@ -7,7 +7,7 @@ def main():
     para rodar o aplicativo, execute o seguinte comando:
     streamlit run main_dash.py
     """
-    main_dashboard()
+    dashboard_main()
 
 if __name__ == "__main__":
     main()

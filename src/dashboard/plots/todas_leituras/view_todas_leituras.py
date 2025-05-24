@@ -33,7 +33,7 @@ class PlotAllView:
             sensores = get_sensores_por_tipo(tipo)
 
             sensores_selecionados[tipo.value] = st.selectbox(
-                label=f"Selecione um sensor de f{str(tipo)}",
+                label=f"Selecione um sensor de {str(tipo)}",
                 options=sensores,
                 format_func=lambda x: str(x),
                 # index=[opt[0] for opt in sensores].index(current_value) if current_value else None,

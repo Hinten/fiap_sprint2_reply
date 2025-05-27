@@ -2,6 +2,7 @@ import logging
 
 from sqlalchemy import String, Enum, Float, Boolean, Integer, DateTime
 
+from src.dashboard.generic.model_form_fields import ModelFormField
 from src.dashboard.global_messages import add_global_message
 from src.database.dynamic_import import import_models, get_model_by_table_name
 from src.database.tipos_base.model import Model
@@ -179,142 +180,16 @@ class EditView:
                 logging.debug('Campo id não editável, skipping...')
                 continue
 
-            value = None if self.instance is None else getattr(self.instance, field.name)
-            new_value = None
+            initial_value = None if self.instance is None else getattr(self.instance, field.name)
 
+            form_field = ModelFormField(self.model, field_name=field.name)
 
-            if bool(field.foreign_keys):
-                #pega todos os items da tabela relacionada e exibe um selectbox
+            new_value = form_field.render(initial_value=initial_value, show_validation=self.can_show_validation())
 
-                # Obter o nome da tabela relacionada
-                table_name = list(field.foreign_keys)[0].column.table.name
-
-                # Importar dinamicamente o modelo relacionado
-                related_class = get_model_by_table_name(table_name)
-
-                # Buscar todos os registros da tabela relacionada
-                related_items = related_class.all()
-
-                # Criar opções para o selectbox
-                options = [(item.id, str(item)) for item in related_items]
-
-                # Obter o valor atual
-                current_value = value if value else None
-
-                # Exibir o selectbox
-                new_value = st.selectbox(
-                    label=self.model.get_field_display_name(field.name),
-                    options=options,
-                    format_func=lambda x: x[1],
-                    index=[opt[0] for opt in options].index(current_value) if current_value else None,
-                    help=field.comment,
-                )
-
-                if new_value is not None:
-                    data[field.name] = new_value[0]
-                else:
-                    data[field.name] = None
-
-            elif isinstance(field.type, Enum):
-
-                options = [item.value for item in field.type.enum_class]
-
-                index = options.index(value) if value in options else None
-
-                new_value = st.selectbox(
-                    index=index,
-                    options=options,
-                    format_func=lambda x: str(field.type.enum_class(x)),
-                    label=self.model.get_field_display_name(field.name),
-                    help=field.comment,
-                    placeholder="Escolha uma opção",
-
-                )
-
+            if new_value is not None:
                 data[field.name] = new_value
-
-            elif isinstance(field.type, Float):
-                # Exibir um campo de texto para editar o valor
-                new_value = st.number_input(
-                    value=value,
-                    label=self.model.get_field_display_name(field.name),
-                    help=field.comment,
-                    format="%.2f",
-                    step=0.01,
-                )
-
-                data[field.name] = new_value
-
-            elif isinstance(field.type, Integer):
-                # Exibir um campo de texto para editar o valor
-                new_value = st.number_input(
-                    value=value,
-                    label=self.model.get_field_display_name(field.name),
-                    help=field.comment,
-                    format="%d",
-                    step=1,
-                )
-
-                data[field.name] = new_value
-
-            elif isinstance(field.type, Boolean):
-
-                if field.nullable:
-                    options = ["Sim", "Não", "Indefinido"]
-                else:
-                    options = ["Sim", "Não"]
-
-                _valor = "Sim" if value else "Não" if value is not None else "Indefinido"
-
-                index = options.index(_valor) if _valor in options else None
-
-                new_value = st.selectbox(
-                    label=self.model.get_field_display_name(field.name),
-                    options=options,
-                    index=index,
-                    help=field.comment,
-                )
-
-                data[field.name] = True if new_value == "Sim" else False
-
-            elif isinstance(field.type, String):
-                # Exibir um campo de texto para editar o valor
-                new_value = st.text_input(
-                    value=value,
-                    label=self.model.get_field_display_name(field.name),
-                    help=field.comment,
-                    max_chars=field.type.length,
-                )
-
-                data[field.name] = new_value
-
-            elif isinstance(field.type, DateTime):
-                # Exibir um campo de data/hora para editar o valor
-                date = st.date_input(
-                    label=f"{self.model.get_field_display_name(field.name)} - Data",
-                    format="DD/MM/YYYY",
-                    value=value,
-                    help=field.comment,
-                )
-
-                time = st.time_input(
-                    label=f"{self.model.get_field_display_name(field.name)} - Hora",
-                    value=value,
-                    help=field.comment,
-                )
-
-                if date is not None or time is not None:
-
-                    dateTimeValue = datetime.combine(date or datetime.now().date(), time or datetime.now().time())
-
-                    data[field.name] = dateTimeValue
-                else:
-                    data[field.name] = None
-
             else:
-                logging.warning(f"Tipo de campo não suportado: {field.type}")
-                st.warning(f"Tipo de campo não suportado: {field.type}")
-                raise NotImplementedError(f"Tipo de campo não suportado: {field.type}")
+                data[field.name] = None
 
             if self.can_show_validation() and self.model.validate_field(field.name, new_value):
                 st.warning(f"Valor inválido para o campo {self.model.get_field_display_name(field.name)}: {self.model.validate_field(field.name, new_value)}")

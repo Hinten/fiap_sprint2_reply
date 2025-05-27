@@ -6,6 +6,9 @@ from src.database.tipos_base.database import Database
 from src.database.tipos_base.model import Model
 from datetime import datetime, date, time, timedelta
 
+from src.plots.plot_config import GenericPlot, PlotField, TipoGrafico, OrderBy
+
+
 class TipoSensorEnum(StrEnum):
     FOSFORO = "P"
     POTASSIO = "K"
@@ -175,7 +178,6 @@ class Sensor(Model):
 
             return sensores
 
-
 class LeituraSensor(Model):
     """Representa uma leitura de um sensor em um determinado momento."""
 
@@ -183,6 +185,17 @@ class LeituraSensor(Model):
     __menu_group__ = "Sensores"
     __menu_order__ = 3
     __database_import_order__ = 12
+    __generic_plot__ = GenericPlot(
+        eixo_x=[PlotField(field='data_leitura', display_name='Data da Leitura')],
+        eixo_y=[PlotField(field='valor', display_name='Valor')],
+        tipo=TipoGrafico.LINHA,
+        title="Gráfico de Leituras do Sensor",
+        filters=[
+            PlotField(field='sensor_id', display_name='Sensor'),
+            PlotField(field='data_leitura', display_name='Data da Leitura'),
+        ],
+        order_by=[OrderBy(field='data_leitura', asc=True)]
+    )
 
     @classmethod
     def display_name(cls) -> str:

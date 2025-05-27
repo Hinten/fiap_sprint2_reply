@@ -1,5 +1,6 @@
 import streamlit as st
 from src.dashboard.generic.edit_view import EditView
+from src.dashboard.generic.simple_plots import SimplePlotView
 from src.database.tipos_base.model import Model
 
 
@@ -29,12 +30,32 @@ class TableView:
     #
     #     return page
 
+    def get_plot_page(self) -> st.Page:
+        """
+        Retorna a página de plotagem genérica do modelo.
+        :return: st.Page - A página para plotagem do modelo.
+        """
+        if self.model.__generic_plot__ is None:
+            raise NotImplementedError(
+                "A classe não implementa o método 'get_plot_page' ou não possui um 'generic_plot' definido.")
+
+        plot_view = SimplePlotView(self.model)
+
+        return st.Page(
+                plot_view.view,
+                title=f"{self.model.display_name_plural()} - Gráfico",
+                url_path=f"{self.model.__name__.lower()}/grafico"
+            )
+
     def get_routes(self) -> list:
 
         rotas = [
             self.get_table_page(),
             # self.get_edit_page(),
         ]
+
+        if self.model.__generic_plot__ is not None:
+            rotas.append(self.get_plot_page())
 
         return rotas
 

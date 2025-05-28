@@ -44,7 +44,7 @@ class TableView:
         return st.Page(
                 plot_view.view,
                 title=f"{self.model.display_name_plural()} - Gráfico",
-                url_path=f"{self.model.__name__.lower()}/grafico"
+                url_path=f"{self.model.__name__.lower()}-grafico"
             )
 
     def get_routes(self) -> list:

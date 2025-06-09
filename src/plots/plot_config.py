@@ -37,7 +37,7 @@ class GenericPlot:
         tipo (TipoGrafico): Tipo do gráfico (opcional, padrão é 'linha').
         labels_eixo_y (Optional[list]): Rótulos personalizados para os valores do eixo Y (opcional).
         title (Optional[str]): Título do gráfico (opcional).
-        filters (Optional[list[PlotField]]): Filtros para os campos do gráfico (opcional).
+        filters (Optional[list[SimpleTableFilter]]): Filtros para os campos do gráfico (opcional).
         order_by (Optional[list[OrderBy]]): Ordenação dos dados do gráfico (opcional).
 
     '''

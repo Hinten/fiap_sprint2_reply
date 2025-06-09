@@ -1,6 +1,7 @@
 from src.database.dynamic_import import import_models
 from src.database.tipos_base.database import Database
 from sqlalchemy import text
+import logging
 
 
 def get_sequences_from_db():
@@ -29,7 +30,14 @@ def reset_contador_ids():
     """
     Reseta o contador de IDs para cada tabela no banco de dados.
     """
+
+    # Checa se o engine é Oracle
+    if 'oracle' not in Database.engine.name.lower():
+        logging.debug("O banco de dados não é Oracle. A função reset_contador_ids só é suportada para bancos de dados Oracle.")
+        return
+
     session = Database.session()
+
     for table_name, sequence_name in get_table_and_sequence_names():
         primary_key_column = 'ID'
         reset_sequence_sql = text(f"""

@@ -3,8 +3,6 @@ import streamlit as st
 from src.dashboard.database.exportar import exportar_db_page
 from src.dashboard.database.importar import importar_db_page
 from src.dashboard.generic.table_view import TableView
-from src.dashboard.plots.views import grafico_umidade_view, grafico_estado_do_rele, grafico_ph, grafico_fosforo, \
-    grafico_potassio, grafico_tudo
 from src.dashboard.principal import get_principal_page
 from src.database.dynamic_import import import_models
 
@@ -33,20 +31,6 @@ def crud_menu():
             view = TableView(model)
             st.sidebar.page_link(view.get_table_page())
 
-def plot_menu():
-    """
-    Função para exibir o menu lateral do aplicativo.
-    Cria as páginas de gráficos para os modelos do banco de dados.
-    """
-
-    st.sidebar.header("Gráficos")
-    st.sidebar.page_link(grafico_tudo.get_page())
-    st.sidebar.page_link(grafico_umidade_view.get_page())
-    st.sidebar.page_link(grafico_estado_do_rele.get_page())
-    st.sidebar.page_link(grafico_ph.get_page())
-    st.sidebar.page_link(grafico_fosforo.get_page())
-    st.sidebar.page_link(grafico_potassio.get_page())
-
 
 def export_import_menu():
     """
@@ -54,7 +38,7 @@ def export_import_menu():
     Cria as páginas de exportação e importação do banco de dados.
     """
 
-    st.sidebar.header("Exportar/Importar")
+    st.sidebar.header("Exportar/Importar DB")
     st.sidebar.page_link(exportar_db_page)
     st.sidebar.page_link(importar_db_page)
 
@@ -67,6 +51,5 @@ def menu():
 
     st.sidebar.page_link(get_principal_page())
     crud_menu()
-    plot_menu()
     export_import_menu()
 

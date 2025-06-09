@@ -6,6 +6,8 @@ from src.plots.generic.grafico_linha import get_grafico_linha
 from src.database.tipos_base.model import Model
 import pandas as pd
 
+from src.plots.plot_config import TipoGrafico
+
 
 class ModelPlotter:
     def __init__(self, model:type[Model]):
@@ -36,18 +38,17 @@ class ModelPlotter:
             select_fields=[f.field for f in self.model.__generic_plot__.eixo_x] + [f.field for f in self.model.__generic_plot__.eixo_y]
         )
 
-    def get_plot(self, filters:list[BinaryExpression] or None = None) -> plt.Figure:
+    def get_plot(self, dataframe:pd.DataFrame) -> plt.Figure:
         """
         Obtém os dados da instância formatados para plotagem e retorna o DataFrame.
         """
-        dataframe = self.get_data_for_plot(filters=filters)
 
         match self.model.__generic_plot__.tipo:
-            case 'grafico_degrau':
+            case TipoGrafico.DEGRAU:
                 return self.get_grafico_degrau(dataframe)
-            case 'grafico_barras':
+            case TipoGrafico.BARRAS:
                 return self.get_grafico_barras(dataframe)
-            case 'grafico_linha':
+            case TipoGrafico.LINHA:
                 return self.get_grafico_linha(dataframe)
             case _:
                 raise ValueError(f"Tipo de gráfico '{self.model.__generic_plot__.tipo}' não suportado.")

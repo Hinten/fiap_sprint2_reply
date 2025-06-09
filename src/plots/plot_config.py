@@ -2,6 +2,9 @@ from typing import Optional, Literal, List
 from enum import Enum
 from dataclasses import dataclass
 
+from src.database.tipos_base.model_mixins.display import SimpleTableFilter
+
+
 class TipoGrafico(Enum):
     LINHA = 'linha'
     BARRAS = 'barras'
@@ -44,6 +47,6 @@ class GenericPlot:
     tipo: TipoGrafico = TipoGrafico.LINHA
     labels_eixo_y: Optional[List[str]] = None
     title: Optional[str] = None
-    filters: Optional[list[PlotField]] = None
+    filters: Optional[list[SimpleTableFilter]] = None
     order_by: Optional[list[OrderBy]] = None
 

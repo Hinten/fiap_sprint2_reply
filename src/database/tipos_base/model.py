@@ -13,6 +13,7 @@ from src.plots.plot_config import GenericPlot
 from sqlalchemy.sql.elements import BinaryExpression, UnaryExpression
 from sqlalchemy import String, Enum, Float, Boolean, Integer, DateTime
 from datetime import datetime
+from calendar import monthrange
 
 
 #https://docs.sqlalchemy.org/en/20/orm/quickstart.html
@@ -97,7 +98,7 @@ class Model(DeclarativeBase,
                 # Data e hora aleatórias entre 2000-01-01 e 2023-12-30
                 year = randint(2000, 2023)
                 month = randint(1, 12)
-                day = randint(1, 30)
+                day = randint(1, monthrange(year, month)[1])
 
                 data[field.name] = datetime(year, month, day, randint(0, 23), randint(0, 59), randint(0, 59))
 
@@ -118,53 +119,14 @@ class Model(DeclarativeBase,
 
         return cls.from_dict(data)
 
-
     @classmethod
-    def filter_dataframe(cls,
-                         filters: Optional[List[BinaryExpression]] = None,
-                         order_by: Optional[List[UnaryExpression]] = None,
-                         select_fields: Optional[List[str]] = None,
-                         as_display: bool = False,
-                         ) -> pd.DataFrame:
+    def random_range(cls, nullable: bool = True, quantity: int = 100, **kwargs) -> List[Self]:
         """
-        Obtém os dados da instância formatados para plotagem.
+        Cria uma lista de instâncias da classe com valores aleatórios para os campos definidos.
+        :param nullable: bool - Se True, alguns campos podem ser None.
+        :param quantity: int - Quantidade de instâncias a serem criadas.
+        :param kwargs: Parâmetros adicionais para personalizar a geração de dados.
+        :return: Lista de instâncias da classe com valores aleatórios.
         """
+        return [cls.random(nullable=nullable) for _ in range(quantity)]
 
-        # faz um query com o sqlalchemy filtrando pelos filters do generic_plot e ordernando pelos order_by do generic_plot
-
-        with Database.get_session() as session:
-            query = session.query(cls.__class__)
-
-            if filters is not None:
-                query = query.filter(*filters)
-
-            if order_by:
-                query = query.order_by(*order_by)
-
-            else:
-                # se não tiver order_by, ordena pelo id
-                query = query.order_by(cls.id.asc())
-
-            # limita os campos retornados
-            campos_para_retornar = []
-
-            if select_fields is None:
-                campos_para_retornar = cls.fields()
-            else:
-                for field in select_fields:
-                    if not hasattr(cls, field):
-                        raise AttributeError(f"A classe {cls.__class__.__name__} não possui o atributo '{field}'.")
-                    campos_para_retornar.append(getattr(cls, field))
-
-            # como vai retornar apenas o dataframe para gerar o gráfico, não precisa retornar todos os campos da tabela,
-            query = query.with_entities(campos_para_retornar)
-
-            dataframe = pd.read_sql(query.statement, session.bind)
-
-            if as_display:
-                colum_names = {}
-                for column in dataframe.columns:
-                    colum_names[column] = cls.get_field_display_name(column)
-                dataframe.rename(columns=colum_names)
-
-            return dataframe

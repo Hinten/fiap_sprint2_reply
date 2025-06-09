@@ -1,11 +1,9 @@
 import streamlit as st
 
+
 def _principal():
 
-    st.title("Saudações!")
-
-    # todo arrumar logo principal
-    # st.image("assets/logo/logo-farmtech-solutions.png", width=600)
+    st.write("Página Principal")
 
 def get_principal_page() -> st.Page:
     """

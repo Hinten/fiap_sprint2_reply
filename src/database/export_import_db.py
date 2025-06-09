@@ -22,11 +22,11 @@ def convert_database_to_dataframes() -> list[tuple[Model, pd.DataFrame]]:
 
     for model_name, model_class in models.items():
         try:
-            dataframe = model_class.as_dataframe()
+            dataframe = model_class.as_dataframe_all()
             response.append((model_class, dataframe))
         except DatabaseError as e:
             if e.code == " DPY-4011":
-                dataframe = model_class.as_dataframe()
+                dataframe = model_class.as_dataframe_all()
                 response.append((model_class, dataframe))
             else:
                 print(e.code)

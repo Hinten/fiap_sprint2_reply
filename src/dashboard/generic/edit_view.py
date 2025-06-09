@@ -138,7 +138,6 @@ class EditView:
             new_instance.save()
 
             add_global_message("Registro salvo com sucesso!")
-            logging.info(f"Registro salvo com sucesso: {new_instance}")
 
             if st.query_params.get('id') is not None:
                 st.query_params.pop('id')
@@ -190,9 +189,6 @@ class EditView:
                 data[field.name] = new_value
             else:
                 data[field.name] = None
-
-            if self.can_show_validation() and self.model.validate_field(field.name, new_value):
-                st.warning(f"Valor inválido para o campo {self.model.get_field_display_name(field.name)}: {self.model.validate_field(field.name, new_value)}")
 
         return data
 

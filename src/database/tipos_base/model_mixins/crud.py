@@ -1,7 +1,9 @@
 from abc import abstractmethod
 
+import logging
+
 from src.database.tipos_base.database import Database
-from sqlalchemy import inspect
+from sqlalchemy import inspect, BinaryExpression, UnaryExpression
 from typing import Self
 
 class _ModelCrudMixin:
@@ -43,6 +45,7 @@ class _ModelCrudMixin:
         with Database.get_session() as session:
             session.add(self)
             session.commit()
+            logging.info(f"Registro salvo com sucesso: {self.id}")
 
         return self
 
@@ -84,3 +87,76 @@ class _ModelCrudMixin:
             session.commit()
 
         return self
+
+    @classmethod
+    def count(cls, filters:list[BinaryExpression] or None = None) -> int:
+        """
+        Conta o número de registros na tabela.
+        :param filters: list[BinaryExpression] or None - Filtros a serem aplicados na contagem.
+        :return: int - Número de registros.
+        """
+        with Database.get_session() as session:
+
+            if filters:
+                return session.query(cls).filter(*filters).count()
+
+            return session.query(cls).count()
+
+    @classmethod
+    def first(cls,
+              filters:list[BinaryExpression] or None = None,
+              order_by: list[UnaryExpression] or None = None,
+              ) -> Self | None:
+        """
+        Busca o primeiro registro que atende aos filtros fornecidos.
+        :param filters: list[BinaryExpression] or None - Filtros a serem aplicados na busca.
+        :param order_by: list[UnaryExpression] or None - Ordenação a ser aplicada na busca.
+        :return: Model | None - Primeira instância encontrada ou None.
+        """
+        with Database.get_session() as session:
+
+            query = session.query(cls)
+
+            if filters:
+                query = query.filter(*filters)
+            if order_by:
+                query = query.order_by(*order_by)
+            else:
+                query = query.order_by(cls.id.asc())
+
+            return query.first()
+
+    @classmethod
+    def last(cls,
+              filters:list[BinaryExpression] or None = None,
+              order_by: list[UnaryExpression] or None = None,
+              ) -> Self | None:
+        """
+        Busca o último registro que atende aos filtros fornecidos.
+        :param filters: list[BinaryExpression] or None - Filtros a serem aplicados na busca.
+        :param order_by: list[UnaryExpression] or None - Ordenação a ser aplicada na busca.
+        :return: Model | None - Última instância encontrada ou None.
+        """
+        with Database.get_session() as session:
+
+            query = session.query(cls)
+
+            if filters:
+                query = query.filter(*filters)
+
+            if order_by:
+
+                query = query.order_by(*order_by)
+
+                count = query.count()
+
+                if count == 0:
+                    return None
+
+                return query.offset(count - 1).first()
+
+            else:
+                # se não tiver order_by, ordena pelo id
+                order_by = [cls.id.desc()]
+                query = query.order_by(*order_by)
+                return query.first()

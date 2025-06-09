@@ -147,7 +147,7 @@ class Database:
         from src.database.tipos_base.model import Model
         from src.database.dynamic_import import import_models
 
-        import_models()
+        import_models(sort=True)
 
         try:
             Model.metadata.drop_all(bind=cls.engine)

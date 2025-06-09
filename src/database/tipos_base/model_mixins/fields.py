@@ -77,8 +77,9 @@ class _ModelFieldsMixin:
                 return f"Valor inválido para o campo '{cls.get_field_display_name(field)}'. Esperado: {field.type.python_type.__name__}."
 
         if isinstance(field.type, String):
-            if len(value) > field.type.length:
-                return f"Valor muito longo para o campo '{cls.get_field_display_name(field)}'. Máximo: {field.type.length} caracteres."
+            if field.type.length is not None and value is not None:
+                if len(value) > field.type.length:
+                    return f"Valor muito longo para o campo '{cls.get_field_display_name(field)}'. Máximo: {field.type.length} caracteres."
 
         return None
 

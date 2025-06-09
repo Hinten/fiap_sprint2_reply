@@ -1,14 +1,10 @@
+import pandas as pd
 import streamlit as st
-from src.dashboard.generic.model_form_fields import ModelFormField
-from src.dashboard.plots.generic.grafico_barras import get_grafico_barras
-from src.dashboard.plots.generic.grafico_degrau import get_grafico_degrau
-from src.dashboard.plots.generic.grafico_linha import get_grafico_linha
-from src.dashboard.plots.generic.utils import get_sensores_por_tipo, get_leituras_for_sensor
-from src.database.generator.criar_dados_leitura import criar_dados_litura_para_sensor
-from src.database.models.sensor import TipoSensorEnum, LeituraSensor, Sensor
-from datetime import datetime, timedelta
+from sqlalchemy import BinaryExpression
+from src.dashboard.generic.model_query_filters import ModelQueryFilters
 
 from src.database.tipos_base.model import Model
+from src.plots.model_plot import ModelPlotter
 
 
 class SimplePlotView:
@@ -23,84 +19,65 @@ class SimplePlotView:
         """
         st.title(f"Gráfico de {self.model.display_name_plural()}")
 
-        filter_data = {}
+        plot_filters = ModelQueryFilters(self.model,
+                                         self.model.__generic_plot__.filters,
+                                         show_validation=st.query_params.get('show_validation', False) == '1',
+                                         show_botao_filtrar=False
+                                         )
 
-        for plot_field in self.model.__generic_plot__.filters:
-
-            form_field = ModelFormField(self.model, plot_field.field)
-
-            new_value = form_field.render()
-
-            filter_data[plot_field.field] = new_value
+        plot_filters.render()
 
         col1, col2 = st.columns(2)
 
-        simulacao = None
-        real = None
+        simulacao = st.query_params.get('simulacao', False)
+        real = st.query_params.get('real', False)
 
         with col1:
-            simulacao = st.button("Gerar Simulação")
+            if st.button("Gerar Simulação"):
+                plot_filters.apply_filters()
+                st.query_params['simulacao'] = '1'
+                st.query_params.pop('real', None)
+                st.rerun()
 
 
         with col2:
-            real = st.button("Gerar Gráfico")
+            if st.button("Gerar Gráfico Real"):
+                plot_filters.apply_filters()
+                st.query_params['real'] = '1'
+                st.query_params.pop('simulacao', None)
+                st.rerun()
 
-        raise NotImplementedError("A funcionalidade de plotagem ainda não foi implementada.")
+        if simulacao or real:
 
-        # if simulacao or real:
-        #
-        #     for plot_field in self.model.__generic_plot__.filters:
-        #         form_field = ModelFormField(self.model, plot_field.field)
-        #         value = filter_data.get(plot_field.field)
-        #         if not form_field.is_valid(value, required=not plot_field.optional):
-        #             st.error(f"Erro ao validar o campo {plot_field.field}: {form_field.validate(value, required=not plot_field.optional)}")
-        #             return
-        #
-        #
-        # if (simulacao or real) and (
-        #         sensor_selecionado is None or data_inicial is None or data_final is None
-        # ):
-        #     st.warning("Selecione um sensor e as datas para gerar o gráfico.")
-        #
-        # elif simulacao:
-        #     leituras = criar_dados_litura_para_sensor(
-        #         data_inicial=data_inicial,
-        #         data_final=data_final,
-        #         sensor_id=sensor_selecionado.id,
-        #         total_leituras=20,
-        #         tipo_sensor=self.tipo_sensor
-        #     )
-        #
-        #     self.get_grafico(sensor_selecionado, leituras,
-        #                      f"Gráfico Simulação de {self.tipo_sensor} do sensor {sensor_selecionado.nome}")
-        #
-        #
-        # elif real:
-        #     leituras = get_leituras_for_sensor(sensor_selecionado.id, data_inicial, data_final)
-        #
-        #     if len(leituras) > 0:
-        #         self.get_grafico(sensor_selecionado, leituras,
-        #                          f"Gráfico Real de {self.tipo_sensor} do sensor {sensor_selecionado.nome}")
-        #     else:
-        #         st.warning("Nenhum dado encontrado para o sensor selecionado entre as datas informadas.")
+            if not plot_filters.filters_valid():
+                st.error("Por favor, preencha todos os filtros obrigatórios.")
+                st.query_params['show_validation'] = '1'
+                return
+            else:
+                st.query_params.pop('show_validation', None)
 
+        if simulacao:
+            data = self.model.random_range(nullable=False, quantity=100, **{'values': plot_filters.get_filter_values(), 'values_by_name': plot_filters.get_filter_values_by_name()})
 
-    def get_grafico(self, sensor_selecionado:Sensor, leituras: list[LeituraSensor], title: str):
-        """
-        Função para gerar o gráfico de acordo com o tipo selecionado.
-        :param leituras: instâncias de LeituraSensor
-        :param title: título do gráfico
-        :return:
-        """
+            dataframe = pd.DataFrame(map(lambda x: x.to_dict(), data))
 
-        raise NotImplementedError("A funcionalidade de plotagem ainda não foi implementada.")
+            print(dataframe)
 
-        # if self.tipo_grafico == TipoGraficoEnum.BARRAS:
-        #     get_grafico_barras(leituras, f"Gráfico de {self.tipo_sensor} do sensor {sensor_selecionado.nome}")
-        # elif self.tipo_grafico == TipoGraficoEnum.LINHA:
-        #     get_grafico_linha(leituras, f"Gráfico de {self.tipo_sensor} do sensor {sensor_selecionado.nome}")
-        # elif self.tipo_grafico == TipoGraficoEnum.DEGRAU:
-        #     get_grafico_degrau(leituras, f"Gráfico de {self.tipo_sensor} do sensor {sensor_selecionado.nome}", labels=self.labels)
+            model_plotter = ModelPlotter(self.model)
+
+            grafico = model_plotter.get_plot(dataframe)
+
+            st.pyplot(grafico)
+
+        elif real:
+
+            filters:list[BinaryExpression] = plot_filters.get_sqlalchemy_filters()
+
+            model_plotter = ModelPlotter(self.model)
+            dataframe = model_plotter.get_data_for_plot(filters=filters)
+            grafico = model_plotter.get_plot(dataframe)
+            st.pyplot(grafico)
+
 
 
     def get_page(self) -> st.Page:

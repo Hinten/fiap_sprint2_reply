@@ -1,12 +1,15 @@
+from io import BytesIO
+
 from src.database.dynamic_import import get_model_by_table_name
 from src.database.tipos_base.model import Model
 from typing import Any
 from enum import Enum
 import streamlit as st
-from sqlalchemy import String, Enum, Float, Boolean, Integer, DateTime
+from sqlalchemy import String, Text, Enum, Float, Boolean, Integer, DateTime, LargeBinary
 from datetime import datetime
 import logging
 from typing import Optional
+from PIL import Image
 
 
 class ModelFormField:
@@ -15,12 +18,14 @@ class ModelFormField:
                  model: type[Model],
                  field_name: str,
                  label: Optional[str] = None,
+                 nullable: bool or None = None
                  ):
         self.model = model
         self.field_name = field_name
         self.field = model.get_field(field_name)
         self.label = label or model.get_field_display_name(field_name)
         self.current_value = None
+        self.nullable = nullable or self.field.nullable
 
     def render(self, initial_value=None, show_validation=False) -> Any:
 
@@ -111,15 +116,6 @@ class ModelFormField:
                 help=self.field.comment,
             )
 
-        elif isinstance(self.field.type, String):
-            # Exibir um campo de texto para editar o valor
-            new_value = st.text_input(
-                value=initial_value,
-                label=self.label,
-                help=self.field.comment,
-                max_chars=self.field.type.length,
-            )
-
         elif isinstance(self.field.type, DateTime):
             # Exibir um campo de data/hora para editar o valor
             date = st.date_input(
@@ -142,12 +138,56 @@ class ModelFormField:
             else:
                 new_value = None
 
+        elif isinstance(self.field.type, Text):
+            # Exibir um campo de texto para editar o valor
+            new_value = st.text_area(
+                value=initial_value,
+                label=self.label,
+                help=self.field.comment,
+                max_chars=self.field.type.length,
+            )
+
+        elif isinstance(self.field.type, String):
+            # Exibir um campo de texto para editar o valor
+            new_value = st.text_input(
+                value=initial_value,
+                label=self.label,
+                help=self.field.comment,
+                max_chars=self.field.type.length,
+            )
+
+        elif isinstance(self.field.type, LargeBinary):
+
+            extensions = self.field.info.get('extensions', None)
+
+            if initial_value:
+
+                if extensions is not None and 'jpeg' in extensions:
+                    imagem = Image.open(BytesIO(initial_value))
+                    st.write(imagem)
+
+                else:
+                    st.write("Arquivo carregado, mas não é possível exibir o conteúdo.")
+
+
+            uploaded_file = st.file_uploader(
+                label=self.label,
+                type=extensions,
+                help=self.field.comment,
+            )
+
+            if uploaded_file is not None:
+                new_value = uploaded_file.read()
+            else:
+                new_value = initial_value
+
         else:
             logging.warning(f"Tipo de campo não suportado: {self.field.type}")
             st.warning(f"Tipo de campo não suportado: {self.field.type}")
+            print(self.field.type, type(self.field.type))
             raise NotImplementedError(f"Tipo de campo não suportado: {self.field.type}")
 
-        if show_validation and self.validate(new_value):
+        if show_validation and self.validate(new_value, required=not self.nullable):
             st.warning(f"Valor inválido para o campo {self.label}: {self.validate(new_value)}")
 
         self.current_value = new_value
@@ -156,7 +196,12 @@ class ModelFormField:
 
     def validate(self, value:Any, required:bool=True) -> str or None:
         if value is None and not required:
+            print(f"Campo {self.label} não é obrigatório e o valor é None.")
             return None
+
+        if value is None and required:
+            print(f"Campo {self.label} é obrigatório e o valor é None.")
+            return f"O campo {self.label} é obrigatório."
 
         return self.model.validate_field(self.field.name, value)
 

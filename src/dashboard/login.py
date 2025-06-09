@@ -23,7 +23,7 @@ def cached_login(username, password, dsn):
 def login_view():
     #título
 
-    st.title("Farm Tech Solutions")
+    st.title("Saudações, seja bem-vindo(a) ao Dashboard!")
 
     st.subheader("Login")
 

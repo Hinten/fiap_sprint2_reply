@@ -1,133 +1,198 @@
-// Essa aplicação tem o objetivo verificar a necessidade de irrigação através da utilização de 4 sensores
-// Sensores: LDR (pH simulador), Umidade, Botão Azul (Fósforo Simulado) e Botão Amarelo (Potássio Simulado)
-// Quando 2 ou mais sensores apontarem resultados negativos o relé do sistema de irrigação será acionado e o led irá acender
-// Cado API Meteorológica. representada pelo Botão Vermelho, informe que que haverá chuva o sistema de irrigação será interrompido
+//Verifica a vibração máxima permitida com base no valor da variável "LIMIAR_VIBRACAO", caso ultrapasse esse limiar envia um alerta
+//
 
-// CONDIÇÃO NEGATIVA DE CADA SENSOR:
-// LDR (pH simulador): Valor > 7 (Aplicado um fator de divisão por 100, por pH só vai de 0 a 14 e o LDR vai de 0 a 4000), 
-// Umidade: Valor < 60% 
-// Botão Azul (Fósforo Simulado): Desligado
-// Botão Amarelo (Potássio Simulado): Desligado
 
-#include <DHT.h> // Inclusão da biblioteca do sensor DHT22
+#include <Wire.h>
+#include <MPU6050.h>
+#include <LiquidCrystal_I2C.h>
 
-// === DEFINIÇÃO DE PINOS ===
-#define BUTTON_P 5        // Botão de fósforo (azul)
-#define BUTTON_K 4        // Botão de potássio (amarelo)
-#define LDR_PIN 14        // Pino analógico para simular pH via LDR
-#define DHTPIN 12         // Sensor DHT22 (umidade)
-#define DHTTYPE DHT22     // Tipo do sensor
-#define RELAY_PIN 34      // Relé que aciona a bomba
-#define LED_PIN 2         // LED indicativo da bomba
-#define BUTTON_API 18     // Botão de API Meteorológica (vermelho)
+MPU6050 mpu;
 
-// === OBJETO DO SENSOR DHT ===
-DHT dht(DHTPIN, DHTTYPE);
+// Pinos do LDR, Relé, LED e Buzzer
+const int LDR_PIN = 34;      // Pino do LDR
+const int RELAY_PIN = 32;    // Pino do Relé
+const int LED_PIN = 15;      // Pino do LED
+const int BUZZER_PIN = 2;    // Pino do Buzzer
 
-// === VARIÁVEIS DE ESTADO DOS BOTÕES ===
-bool estadoFosforo = false;
-bool ultimoEstadoFosforo = HIGH;
+// Variáveis
+float vibracaoTotal = 0;
+float vibracaoMedia = 0;
+const int NUM_AMOSTRAS = 100;
+const float LIMIAR_VIBRACAO = 1.0;  // Ajuste esse valor com base nos testes
 
-bool estadoPotassio = false;
-bool ultimoEstadoPotassio = HIGH;
-
-bool estadoAPI = false;
-bool ultimoEstadoAPI = HIGH;
+// Inicializa o LCD I2C no endereço 0x27 com tamanho 16x2
+LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 void setup() {
-  // Inicializa comunicação serial
   Serial.begin(115200);
-
-  // Configuração dos pinos de entrada
-  pinMode(BUTTON_P, INPUT_PULLUP);  // Botão de fósforo
-  pinMode(BUTTON_K, INPUT_PULLUP);  // Botão de potássio
-  pinMode(BUTTON_API, INPUT_PULLUP);  // Botão da API
-
-  // Configuração dos pinos de saída
+  
   pinMode(RELAY_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
 
-  // Inicializa o sensor DHT
-  dht.begin();
+  // Inicializa o I2C e o MPU6050
+  Wire.begin(21, 22);  // SDA: 21, SCL: 22 para ESP32
+  lcd.begin(20, 4);
+  lcd.backlight();  // Garante que o backlight do LCD esteja ligado
+  lcd.print("LCD OK!");
+  delay(1000);
+
+  mpu.initialize();
+  if (!mpu.testConnection()) {
+    Serial.println("MPU6050 nao conectado!");
+    while (1);
+  }
 }
 
 void loop() {
-  // === LEITURA E CONTROLE DE ESTADO DOS BOTÕES ===
-  bool leituraFosforo = digitalRead(BUTTON_P);
-  bool leituraPotassio = digitalRead(BUTTON_K);
-  bool leituraAPI = digitalRead(BUTTON_API);
-  bool LedValue = digitalRead(LED_PIN);
 
-  // Verifica mudança de estado do botão de fósforo
-  if (leituraFosforo == LOW && ultimoEstadoFosforo == HIGH) {
-    estadoFosforo = !estadoFosforo; // Alterna o estado
-    delay(200); // Debounce
-  }
-  ultimoEstadoFosforo = leituraFosforo;
+  // Lê o valor do LDR
+  int ldrValue = analogRead(LDR_PIN);
+  int lux = map(ldrValue, 0, 4095, 0, 2000); 
 
-  // Verifica mudança de estado do botão de potássio
-  if (leituraPotassio == LOW && ultimoEstadoPotassio == HIGH) {
-    estadoPotassio = !estadoPotassio; // Alterna o estado
-    delay(200); // Debounce
-  }
-  ultimoEstadoPotassio = leituraPotassio;
+  // Lê a temperatura do MPU6050
+  int rawTemp = mpu.getTemperature();
+  float tempC = rawTemp / 340.0 + 36.53;  //Converte o valor bruto para graus Celsius
 
-  // Verifica mudança de estado do botão da API
-  if (leituraAPI == LOW && ultimoEstadoAPI == HIGH) {
-    estadoAPI = !estadoAPI; // Alterna o estado
-    delay(200); // Debounce
-  }
-  ultimoEstadoAPI = leituraAPI;
+  // Exibe a temperatura e a condição claro/escuro no LCD e no Monitor Serial
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Temp: ");
+  lcd.print(tempC, 1);
+  lcd.print(" C");
 
-  // Leitura do LDR (simulando pH)
-  int ldrValue = analogRead(LDR_PIN);  // Faixa de 0 a 4095 no ESP32
+  Serial.print("Temperatura: ");
+  Serial.print(tempC, 1);
+  Serial.print(" C |");
 
-  // Leitura da umidade com o DHT22
-  float umidade = dht.readHumidity();
-
-  // === CONDIÇÕES DE IRRIGAÇÃO ===
-
-  // Verifica se fósforo e potássio estão presentes
-  bool nutrientesPresentes = !estadoFosforo && !estadoPotassio;
-
- // Verifica se fósforo e potássio estão presentes
-  bool resultadoAPI = !estadoAPI;
-
-  // Condição de pH ideal (simulado pelo LDR)
-  bool phIdeal = (ldrValue > 700);
-
-  // Verifica se a umidade está abaixo do ideal (< 60%)
-  bool umidadeBaixa = umidade < 60;
-
-  // Mostrar valores no Serial Monitor
-  Serial.print("Fósforo: "); Serial.print(estadoFosforo);
-  Serial.print(" | Potássio: "); Serial.print(estadoPotassio);
-  Serial.print(" | LDR (pH simulado): "); Serial.print(ldrValue / 100.0);
-  Serial.print(" | Umidade: "); Serial.print(umidade); Serial.print("%");
-  Serial.print(" | relé (Irrigacao): "); Serial.print(LedValue);
-  Serial.print(" | API: "); Serial.println(estadoAPI);
-   
-  // === AÇÃO: ATIVAR BOMBA ===
-
-  // Atribui 1 para a API de estiver ligada
-  int condicoesAPI = 0;
-  if (estadoAPI) condicoesAPI++;
-  // Conta quantas variáveis estão com valor falso (condição crítica)
-  int condicoesCriticas = 0;
-  if (!estadoFosforo) condicoesCriticas++;
-  if (!estadoPotassio) condicoesCriticas++;
-  if (phIdeal) condicoesCriticas++;
-  if (umidadeBaixa) condicoesCriticas++;
-
-  // Caso 2 ou mais sensores acusem problema a irrigação será acionado
-  // Caso a API comunique que haverá chuva a irrigação será desativada
-  if (condicoesCriticas >= 2 && condicoesAPI == 0) {
-    digitalWrite(RELAY_PIN, HIGH);  // Liga a bomba
-    digitalWrite(LED_PIN, HIGH);    // Liga o LED indicativo
+  lcd.setCursor(0, 1);
+  if (lux < 500) {
+    lcd.print("Condicao: Escuro");
+    Serial.print(" Condição: Escuro |");
+    digitalWrite(LED_PIN, LOW);
+    digitalWrite(RELAY_PIN, LOW);
+    noTone(BUZZER_PIN);
   } else {
-    digitalWrite(RELAY_PIN, LOW);   // Desliga a bomba
-    digitalWrite(LED_PIN, LOW);     // Desliga o LED
+    lcd.print("Condicao: Claro");
+    Serial.print(" Condição: Claro |");
+    for (int i = 0; i < 3; i++) { // Buzzer e LED piscam juntos por 3x
+      digitalWrite(LED_PIN, HIGH);
+      digitalWrite(RELAY_PIN, HIGH);
+      tone(BUZZER_PIN, 1000);
+      delay(300);
+      digitalWrite(LED_PIN, LOW);
+      digitalWrite(RELAY_PIN, LOW);
+      noTone(BUZZER_PIN);
+      delay(300);
+    }
+  }
+  delay(1000);
+
+  // Lê os valores brutos de aceleração
+  int16_t ax_raw, ay_raw, az_raw;
+  mpu.getAcceleration(&ax_raw, &ay_raw, &az_raw);
+
+  // Converte para g (gravidade da Terra)
+  float ax = ax_raw / 16384.0;
+  float ay = ay_raw / 16384.0;
+  float az = az_raw / 16384.0;
+
+  // Lê os valores brutos de rotação
+  int16_t gx_raw, gy_raw, gz_raw;
+  mpu.getRotation(&gx_raw, &gy_raw, &gz_raw);
+
+    // Converte para g (gravidade da Terra)
+  float gx = gx_raw / 131.0;
+  float gy = gy_raw / 131.0;
+  float gz = gz_raw / 131.0;
+
+  // ### Calcula o nível de vibração ###
+  float somaVibracao = 0;
+
+  for (int i = 0; i < NUM_AMOSTRAS; i++) {
+
+    // Calcular o módulo da aceleração total
+    float modulo = sqrt(ax * ax + ay * ay + az * az);
+
+    // Subtrair 1g da gravidade estática
+    float vibracao = abs(modulo - 1.0);
+    somaVibracao += vibracao;
+
+    delay(5); // pequeno intervalo para capturar vibrações rápidas
   }
 
-  delay(1000);  // Espera 1 segundo antes da próxima leitura
+ vibracaoMedia = somaVibracao / NUM_AMOSTRAS;
+
+  Serial.print(" Vibracao media: ");
+  Serial.print(vibracaoMedia, 2);
+  Serial.print(" |");
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Vibracao media: ");
+  lcd.print(vibracaoMedia, 2);
+
+  if (vibracaoMedia > LIMIAR_VIBRACAO) {
+    Serial.print(" ⚠️ Vibração anormal detectada! ⚠️ |");
+    lcd.setCursor(0, 1);
+    lcd.print("#ALERTA DE VIBRACAO#");
+
+    for (int i = 0; i < 3; i++) { // Buzzer e LED piscam juntos por 3x
+      digitalWrite(LED_PIN, HIGH);
+      digitalWrite(RELAY_PIN, HIGH);
+      tone(BUZZER_PIN, 1000);
+      delay(300);
+      digitalWrite(LED_PIN, LOW);
+      digitalWrite(RELAY_PIN, LOW);
+      noTone(BUZZER_PIN);
+      delay(300);
+    }
+  
+  } else {
+    Serial.print(" Vibração normal |");
+    lcd.setCursor(0, 1);
+    lcd.print("Vibracao normal!");
+  }
+  //delay(1000);
+
+    // Alerta de temperatura
+  if (tempC > 70.0) {
+    lcd.setCursor(0, 1);
+    lcd.print("#ALERTA: >70 C#");
+    Serial.print(" ⚠️ TEMPERATURA ALTA! ⚠️ |");
+
+    for (int i = 0; i < 3; i++) {
+      digitalWrite(LED_PIN, HIGH);
+      digitalWrite(RELAY_PIN, HIGH);
+      tone(BUZZER_PIN, 1500);
+      delay(300);
+      digitalWrite(LED_PIN, LOW);
+      digitalWrite(RELAY_PIN, LOW);
+      noTone(BUZZER_PIN);
+      delay(300);
+    }
+  }
+
+  // Exibe os valores de aceleração X, Y, Z no LCD e Monitor Serial
+  lcd.setCursor(0, 2);
+  lcd.print("Accelerometer:");
+  
+  lcd.setCursor(0, 3);
+  lcd.print("x:");
+  lcd.print(ax, 1);
+  lcd.print(" y:");
+  lcd.print(ay, 1);
+  lcd.print(" z:");
+  lcd.print(az, 1);
+
+ 
+  //Imprime os dados
+  Serial.print(" X:");
+  Serial.print(ax, 2);
+  Serial.print(" Y:");
+  Serial.print(ay, 2);
+  Serial.print(" Z:");
+  Serial.println(az, 2);
+
+  delay(5000);
 }

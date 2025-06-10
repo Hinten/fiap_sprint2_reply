@@ -1,195 +1,198 @@
+//Verifica a vibração máxima permitida com base no valor da variável "LIMIAR_VIBRACAO", caso ultrapasse esse limiar envia um alerta
+//
+
 #include <Arduino.h>
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
+#include <Wire.h>
+#include <MPU6050.h>
+#include <LiquidCrystal_I2C.h>
 
-// ============================================================================
-// SISTEMA DE ALERTA DE ENCHENTES - FIAP GS1
-// Utiliza sensores para monitorar nível de água e envia alertas via API.
-// Sensores: LDR (nível simulado) e HC-SR04 (ultrassônico).
-// Relé aciona bomba e LED indica status. Buzzer emite alerta sonoro.
-// Botão simula resposta da API meteorológica.
-// ============================================================================
+MPU6050 mpu;
 
-// === DEFINIÇÃO DE PINOS ===
-#define LDR_PIN      32  // Pino analógico para simular nível de água via LDR
-#define RELAY_PIN    4   // Relé que aciona a bomba
-#define LED_PIN      2   // LED indicativo da bomba
-#define BUTTON_API   18  // Botão para simular resposta da API meteorológica
-#define ECHO_PIN     25  // ECHO do HC-SR04 (medição de distância)
-#define TRIG_PIN     26  // TRIG do HC-SR04 (disparo de pulso)
-#define BUZZER_PIN   23  // Buzzer de alerta
+// Pinos do LDR, Relé, LED e Buzzer
+const int LDR_PIN = 34;      // Pino do LDR
+const int RELAY_PIN = 32;    // Pino do Relé
+const int LED_PIN = 15;      // Pino do LED
+const int BUZZER_PIN = 2;    // Pino do Buzzer
 
-// === CONFIGURAÇÃO DE REDE E API ===
-const char* ssid = NETWORK_SSID;
-const char* password = NETWORK_PASSWORD;
-const int canal_wifi = 6; // Canal do WiFi (no uso real, deixar automático)
-const char* endpoint_api = API_URL; // URL da API
-const String init_sensor = String(endpoint_api) + "/init/";     // Endpoint de inicialização
-const String post_sensor = String(endpoint_api) + "/leitura/";  // Endpoint de envio de dados
+// Variáveis
+float vibracaoTotal = 0;
+float vibracaoMedia = 0;
+const int NUM_AMOSTRAS = 100;
+const float LIMIAR_VIBRACAO = 1.0;  // Ajuste esse valor com base nos testes
 
-// === FUNÇÃO DE CONEXÃO WI-FI ===
-void conectaWiFi() {
-  WiFi.begin(ssid, password, canal_wifi);
-  Serial.print("Conectando ao WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi conectado!");
-}
+// Inicializa o LCD I2C no endereço 0x27 com tamanho 16x2
+LiquidCrystal_I2C lcd(0x27, 20, 4);
 
-// === FUNÇÃO DE ENVIO DE DADOS PARA API ===
-int post_data(JsonDocument& doc, const String& endpoint_api) {
-  Serial.println("Enviando dados para a API: " + endpoint_api);
-
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    http.begin(endpoint_api);
-
-    String jsonStr;
-    serializeJson(doc, jsonStr);
-    int httpCode = http.POST(jsonStr);
-
-    if (httpCode > 0) {
-      Serial.println("Status code: " + String(httpCode));
-      String payload = http.getString();
-      Serial.println(payload);
-    } else {
-      Serial.println("Erro na requisição");
-    }
-    http.end();
-    return httpCode;
-  } else {
-    Serial.println("WiFi desconectado, impossível fazer requisição!");
-  }
-
-  return -1; // Retorna -1 se não conseguiu enviar os dados
-
-}
-
-// === IDENTIFICAÇÃO DO DISPOSITIVO ===
-char chipidStr[17];
-bool iniciou_sensor = false;
-
-void iniciar_sensor() {
-  uint64_t chipid = ESP.getEfuseMac();
-  sprintf(chipidStr, "%016llX", chipid);
-  Serial.printf("Chip ID: %s\n", chipidStr);
-
-  JsonDocument doc;
-  doc["serial"] = chipidStr; // Adiciona o Chip ID ao JSON
-  int httpcode = post_data(doc, init_sensor); // Envia o Chip ID para a API
-
-  if (httpcode >= 200 && httpcode < 300) {
-    Serial.println("Sensor iniciado com sucesso!");
-    iniciou_sensor = true;
-  } else {
-    Serial.println("Falha ao iniciar o sensor na API.");
-  }
-}
-
-// === CONFIGURAÇÃO INICIAL ===
 void setup() {
   Serial.begin(115200);
-
-  // Configuração dos sensores
-  pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
-
-  // Configuração dos botões
-  pinMode(BUTTON_API, INPUT_PULLUP);
-
-  // Configuração dos atuadores
+  
   pinMode(RELAY_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
 
-  // Configuração do PWM para o buzzer
-  ledcSetup(0, 2000, 8); // Canal 0, 2kHz, 8 bits
-  ledcAttachPin(BUZZER_PIN, 0);
+  // Inicializa o I2C e o MPU6050
+  Wire.begin(21, 22);  // SDA: 21, SCL: 22 para ESP32
+  lcd.begin(20, 4);
+  lcd.backlight();  // Garante que o backlight do LCD esteja ligado
+  lcd.print("LCD OK!");
+  delay(1000);
 
-  conectaWiFi();
-}
-
-// === FUNÇÃO DE LEITURA DO SENSOR ULTRASSÔNICO (HC-SR04) ===
-float readDistanceCM() {
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
-  int duration = pulseIn(ECHO_PIN, HIGH);
-  return duration * 0.034 / 2;
-}
-
-
-// === LOOP PRINCIPAL ===
-void loop() {
-  // Cria objeto JSON para envio dos dados
-
-  if (!iniciou_sensor) {
-    iniciar_sensor();
+  mpu.initialize();
+  if (!mpu.testConnection()) {
+    Serial.println("MPU6050 nao conectado!");
+    while (1);
   }
+}
 
-  JsonDocument doc;
-  doc["serial"] = chipidStr;
+void loop() {
 
-  // Leitura do botão da API meteorológica
-  bool leituraAPIMetereologica = digitalRead(BUTTON_API);
-  bool LedValue = digitalRead(LED_PIN);
+  // Lê o valor do LDR
+  int ldrValue = analogRead(LDR_PIN);
+  int lux = map(ldrValue, 0, 4095, 0, 2000); 
 
-  // Leitura do LDR (nível simulado do bueiro)
-  int ldrValue = analogRead(LDR_PIN); // 0 a 4095 no ESP32
+  // Lê a temperatura do MPU6050
+  int rawTemp = mpu.getTemperature();
+  float tempC = rawTemp / 340.0 + 36.53;  //Converte o valor bruto para graus Celsius
 
-  // Leitura do sensor ultrassônico (nível do leito)
-  float distance = readDistanceCM();
+  // Exibe a temperatura e a condição claro/escuro no LCD e no Monitor Serial
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Temp: ");
+  lcd.print(tempC, 1);
+  lcd.print(" C");
 
-  // Condições críticas
-  bool nivelBueiroCritico = (ldrValue > 3000); // Nível elevado no bueiro
-  bool nivelLeitoCritico = (distance > 300);   // Nível elevado no leito (>3m)
-  int condicoesCriticas = 0;
-  if (nivelBueiroCritico) condicoesCriticas++;
-  if (nivelLeitoCritico) condicoesCriticas++;
+  Serial.print("Temperatura: ");
+  Serial.print(tempC, 1);
+  Serial.print(" C |");
 
-  // Mostrar valores no Serial Monitor
-  Serial.print("LDR (Nível Bueiro): "); Serial.print(ldrValue / 10.0); Serial.print("cm");
-  Serial.print(" | Nível Leito: "); Serial.print(distance); Serial.print("cm");
-  Serial.print(" | Relé (Envio de Dados): "); Serial.print(LedValue);
-  Serial.print(" | API: "); Serial.println(leituraAPIMetereologica);
-
-  // Preenche o JSON para envio
-  doc["bueiro"] = ldrValue / 10.0;
-  doc["leito"] = distance;
-  doc["rele"] = LedValue;
-
-  serializeJsonPretty(doc, Serial);
-
-  // === AÇÃO: ATIVAR ALERTA ===
-  if (condicoesCriticas >= 1 or leituraAPIMetereologica == LOW) {
-    Serial.println("ALERTA: Nível elevado de água detectado!");
-    digitalWrite(RELAY_PIN, HIGH);  // Liga a bomba
-    digitalWrite(LED_PIN, HIGH);    // Liga o LED
-
-    // Sequência de tons no buzzer
-    tone(BUZZER_PIN, 261); delay(100);
-    tone(BUZZER_PIN, 293); delay(100);
-    tone(BUZZER_PIN, 329); delay(100);
-    tone(BUZZER_PIN, 349); delay(100);
-    tone(BUZZER_PIN, 392); delay(100);
+  lcd.setCursor(0, 1);
+  if (lux < 500) {
+    lcd.print("Condicao: Escuro");
+    Serial.print(" Condição: Escuro |");
+    digitalWrite(LED_PIN, LOW);
+    digitalWrite(RELAY_PIN, LOW);
     noTone(BUZZER_PIN);
   } else {
-    digitalWrite(RELAY_PIN, LOW);   // Desliga a bomba
-    digitalWrite(LED_PIN, LOW);     // Desliga o LED
-    noTone(BUZZER_PIN);
+    lcd.print("Condicao: Claro");
+    Serial.print(" Condição: Claro |");
+    for (int i = 0; i < 3; i++) { // Buzzer e LED piscam juntos por 3x
+      digitalWrite(LED_PIN, HIGH);
+      digitalWrite(RELAY_PIN, HIGH);
+      tone(BUZZER_PIN, 1000);
+      delay(300);
+      digitalWrite(LED_PIN, LOW);
+      digitalWrite(RELAY_PIN, LOW);
+      noTone(BUZZER_PIN);
+      delay(300);
+    }
+  }
+  delay(1000);
+
+  // Lê os valores brutos de aceleração
+  int16_t ax_raw, ay_raw, az_raw;
+  mpu.getAcceleration(&ax_raw, &ay_raw, &az_raw);
+
+  // Converte para g (gravidade da Terra)
+  float ax = ax_raw / 16384.0;
+  float ay = ay_raw / 16384.0;
+  float az = az_raw / 16384.0;
+
+  // Lê os valores brutos de rotação
+  int16_t gx_raw, gy_raw, gz_raw;
+  mpu.getRotation(&gx_raw, &gy_raw, &gz_raw);
+
+    // Converte para g (gravidade da Terra)
+  float gx = gx_raw / 131.0;
+  float gy = gy_raw / 131.0;
+  float gz = gz_raw / 131.0;
+
+  // ### Calcula o nível de vibração ###
+  float somaVibracao = 0;
+
+  for (int i = 0; i < NUM_AMOSTRAS; i++) {
+
+    // Calcular o módulo da aceleração total
+    float modulo = sqrt(ax * ax + ay * ay + az * az);
+
+    // Subtrair 1g da gravidade estática
+    float vibracao = abs(modulo - 1.0);
+    somaVibracao += vibracao;
+
+    delay(5); // pequeno intervalo para capturar vibrações rápidas
   }
 
-  // Envia os dados para a API
-  if (iniciou_sensor){
-    digitalWrite(LED_PIN, HIGH);
-    post_data(doc, post_sensor);
-    digitalWrite(LED_PIN, LOW);
+ vibracaoMedia = somaVibracao / NUM_AMOSTRAS;
+
+  Serial.print(" Vibracao media: ");
+  Serial.print(vibracaoMedia, 2);
+  Serial.print(" |");
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Vibracao media: ");
+  lcd.print(vibracaoMedia, 2);
+
+  if (vibracaoMedia > LIMIAR_VIBRACAO) {
+    Serial.print(" ⚠️ Vibração anormal detectada! ⚠️ |");
+    lcd.setCursor(0, 1);
+    lcd.print("#ALERTA DE VIBRACAO#");
+
+    for (int i = 0; i < 3; i++) { // Buzzer e LED piscam juntos por 3x
+      digitalWrite(LED_PIN, HIGH);
+      digitalWrite(RELAY_PIN, HIGH);
+      tone(BUZZER_PIN, 1000);
+      delay(300);
+      digitalWrite(LED_PIN, LOW);
+      digitalWrite(RELAY_PIN, LOW);
+      noTone(BUZZER_PIN);
+      delay(300);
+    }
+  
+  } else {
+    Serial.print(" Vibração normal |");
+    lcd.setCursor(0, 1);
+    lcd.print("Vibracao normal!");
+  }
+  //delay(1000);
+
+    // Alerta de temperatura
+  if (tempC > 70.0) {
+    lcd.setCursor(0, 1);
+    lcd.print("#ALERTA: >70 C#");
+    Serial.print(" ⚠️ TEMPERATURA ALTA! ⚠️ |");
+
+    for (int i = 0; i < 3; i++) {
+      digitalWrite(LED_PIN, HIGH);
+      digitalWrite(RELAY_PIN, HIGH);
+      tone(BUZZER_PIN, 1500);
+      delay(300);
+      digitalWrite(LED_PIN, LOW);
+      digitalWrite(RELAY_PIN, LOW);
+      noTone(BUZZER_PIN);
+      delay(300);
+    }
   }
 
-  delay(2000); // Aguarda 2 segundos para próxima leitura
+  // Exibe os valores de aceleração X, Y, Z no LCD e Monitor Serial
+  lcd.setCursor(0, 2);
+  lcd.print("Accelerometer:");
+  
+  lcd.setCursor(0, 3);
+  lcd.print("x:");
+  lcd.print(ax, 1);
+  lcd.print(" y:");
+  lcd.print(ay, 1);
+  lcd.print(" z:");
+  lcd.print(az, 1);
+
+ 
+  //Imprime os dados
+  Serial.print(" X:");
+  Serial.print(ax, 2);
+  Serial.print(" Y:");
+  Serial.print(ay, 2);
+  Serial.print(" Z:");
+  Serial.println(az, 2);
+
+  delay(5000);
 }

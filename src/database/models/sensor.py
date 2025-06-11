@@ -14,30 +14,34 @@ from src.plots.plot_config import GenericPlot, PlotField, TipoGrafico, OrderBy
 
 
 class TipoSensorEnum(StrEnum):
-    PROFUNDIDADE = "P"
-    BUEIRO = "B"
-    LEITO = "L"
+    LUX = "L"
+    TEMPERATURA = "T"
+    VIBRACAO = "V"
 
     def __str__(self):
-        return {
-            "P": "Profundidade",
-            "B": "Nível Bueiro (LDR)",
-            "L": "Nível Leito (Ultrassônico)",
-        }.get(self.value, super().__str__())
+        match self.value:
+            case "L":
+                return "Lux"
+            case "T":
+                return "Temperatura (°C)"
+            case "V":
+                return "Vibração"
+
+        return super().__str__()
 
     def get_type_for_generation(self) -> Union[type[float], type[int], type[bool]]:
-        return {
-            "P": float,
-            "B": float,
-            "L": float,
-        }.get(self.value, float)
+        return float
 
     def get_range_for_generation(self) -> Union[tuple[float, float], None]:
-        return {
-            "P": (0.0, 200.0),
-            "B": (0.0, 400.0),
-            "L": (0.0, 500.0)
-        }.get(self.value, None)
+        match self.value:
+            case "L":
+                return 0.1, 100000.0
+            case "T":
+                return -40.0, 85.0
+            case "V":
+                return 0, 3.0
+
+        return 0, 100.0
 
 
 class TipoSensor(Model):
@@ -177,6 +181,9 @@ class LeituraSensor(Model):
     @classmethod
     def display_name_plural(cls) -> str:
         return "Leituras de Sensores"
+
+    def __str__(self):
+        return f"Sensor_id: {self.sensor_id} - {self.data_leitura.strftime('%Y-%m-%d %H:%M:%S')} - {self.valor}"
 
     id: Mapped[int] = mapped_column(
         Sequence(f"{__tablename__}_SEQ_ID"), primary_key=True, autoincrement=True, nullable=False

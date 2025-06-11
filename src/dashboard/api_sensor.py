@@ -6,6 +6,7 @@ from src.wokwi_api.api_basica import inciar_api_thread_paralelo
 def iniciar_api_sensor():
 
     if os.environ.get("ENABLE_API", "false").lower() != "true":
+        print("API Sensor não está habilitada. Verifique a variável de ambiente ENABLE_API.")
         return
 
     if not st.session_state.get('api_sensor', False):

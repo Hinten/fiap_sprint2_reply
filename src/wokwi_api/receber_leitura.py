@@ -9,25 +9,28 @@ receber_router = APIRouter()
 
 class LeituraRequest(BaseModel):
     serial: str
-    bueiro: float or None
-    leito: float or None
-    rele: bool or None
+    lux: float or None
+    temperatura: float or None
+    vibracao_media: float or None
+    acelerometro_x: float or None # não utilizado
+    acelerometro_y: float or None # não utilizado
+    acelerometro_z: float or None # não utilizado
 
 
 @receber_router.post("/")
-def receber_leitura(item: LeituraRequest):
+def receber_leitura(request: LeituraRequest):
 
-    print(f"Recebendo leitura para o sensor com serial: {item.serial}", item)
+    print(f"Recebendo leitura para o sensor com serial: {request.serial}", request)
 
     now = datetime.now()
 
     with Database.get_session() as session:
-        sensores = session.query(Sensor).filter(Sensor.cod_serial == item.serial).filter().all()
+        sensores = session.query(Sensor).filter(Sensor.cod_serial == request.serial).filter().all()
 
         if not sensores:
             return {
                 "status": "error",
-                "message": f"Sensor com serial '{item.serial}' não encontrado."
+                "message": f"Sensor com serial '{request.serial}' não encontrado."
             }
 
         for sensor in sensores:
@@ -37,25 +40,31 @@ def receber_leitura(item: LeituraRequest):
             if not tipo:
                 return {
                     "status": "error",
-                    "message": f"Tipo de sensor para o sensor com serial '{item.serial}' não encontrado."
+                    "message": f"Tipo de sensor para o sensor com serial '{request.serial}' não encontrado."
                 }
 
-            if tipo.tipo == TipoSensorEnum.BUEIRO and item.bueiro is not None:
+            if tipo.tipo == TipoSensorEnum.LUX and request.lux is not None:
                 nova_leitura = LeituraSensor(
                     sensor_id=sensor.id,
                     data_leitura=now,
-                    valor= item.bueiro
+                    valor= request.lux
                 )
-            elif tipo.tipo == TipoSensorEnum.LEITO and item.leito is not None:
+            elif tipo.tipo == TipoSensorEnum.TEMPERATURA and request.temperatura is not None:
                 nova_leitura = LeituraSensor(
                     sensor_id=sensor.id,
                     data_leitura=now,
-                    valor=item.leito
+                    valor=request.temperatura
+                )
+            elif tipo.tipo == TipoSensorEnum.VIBRACAO and request.vibracao_media is not None:
+                nova_leitura = LeituraSensor(
+                    sensor_id=sensor.id,
+                    data_leitura=now,
+                    valor=request.vibracao_media
                 )
             else:
                 continue
-            print('Salvando nova leitura:', nova_leitura)
             session.add(nova_leitura)
+            print('Nova leitura salva:', nova_leitura)
 
         session.commit()
 

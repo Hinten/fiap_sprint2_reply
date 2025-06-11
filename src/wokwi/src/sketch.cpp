@@ -5,6 +5,97 @@
 #include <Wire.h>
 #include <MPU6050.h>
 #include <LiquidCrystal_I2C.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+
+// Inicializa o LCD I2C no endereço 0x27 com tamanho 16x2
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+
+void iniciar_lcd() {
+  lcd.begin(20, 4);
+  lcd.backlight();  // Garante que o backlight do LCD esteja ligado
+  lcd.print("LCD OK!");
+  delay(1000);
+}
+
+void print_lcd_and_serial(const String& message) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(message);
+  Serial.println(message);
+}
+
+// === CONFIGURAÇÃO DE REDE E API ===
+const char* ssid = NETWORK_SSID;
+const char* password = NETWORK_PASSWORD;
+const int canal_wifi = 6; // Canal do WiFi (no uso real, deixar automático)
+const char* endpoint_api = API_URL; // URL da API
+const String init_sensor = String(endpoint_api) + "/init/";     // Endpoint de inicialização
+const String post_sensor = String(endpoint_api) + "/leitura/";  // Endpoint de envio de dados
+
+// === FUNÇÃO DE CONEXÃO WI-FI ===
+void conectaWiFi() {
+  WiFi.begin(ssid, password, canal_wifi);
+  print_lcd_and_serial("Conectando ao WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  print_lcd_and_serial("WiFi conectado!");
+}
+
+// === FUNÇÃO DE ENVIO DE DADOS PARA API ===
+int post_data(JsonDocument& doc, const String& endpoint_api) {
+  Serial.println("Enviando dados para a API: " + endpoint_api);
+
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(endpoint_api);
+
+    String jsonStr;
+    serializeJson(doc, jsonStr);
+    int httpCode = http.POST(jsonStr);
+
+    if (httpCode > 0) {
+      Serial.println("Status code: " + String(httpCode));
+      String payload = http.getString();
+      Serial.println(payload);
+    } else {
+      Serial.println("Erro na requisição");
+    }
+    http.end();
+    return httpCode;
+  } else {
+    Serial.println("WiFi desconectado, impossível fazer requisição!");
+  }
+
+  return -1; // Retorna -1 se não conseguiu enviar os dados
+
+}
+
+// === IDENTIFICAÇÃO DO DISPOSITIVO ===
+char chipidStr[17];
+bool iniciou_sensor = false;
+
+void iniciar_sensor() {
+  uint64_t chipid = ESP.getEfuseMac();
+  sprintf(chipidStr, "%016llX", chipid);
+  print_lcd_and_serial("Chip ID: " + String(chipidStr));
+
+  JsonDocument doc;
+  doc["serial"] = chipidStr; // Adiciona o Chip ID ao JSON
+  int httpcode = post_data(doc, init_sensor); // Envia o Chip ID para a API
+
+  if (httpcode >= 200 && httpcode < 300) {
+    print_lcd_and_serial("Sensor iniciado com sucesso!");
+    delay(1000); // delay para garantir que a mensagem seja visível
+    iniciou_sensor = true;
+  } else {
+    print_lcd_and_serial(String("Falha ao iniciar o sensor na API: ") + String(httpcode));
+    delay(1000); // delay para garantir que a mensagem seja visível
+  }
+}
 
 MPU6050 mpu;
 
@@ -20,8 +111,6 @@ float vibracaoMedia = 0;
 const int NUM_AMOSTRAS = 100;
 const float LIMIAR_VIBRACAO = 1.0;  // Ajuste esse valor com base nos testes
 
-// Inicializa o LCD I2C no endereço 0x27 com tamanho 16x2
-LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 void setup() {
   Serial.begin(115200);
@@ -29,31 +118,43 @@ void setup() {
   pinMode(RELAY_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
+  // Configuração do PWM para o buzzer
+  ledcSetup(0, 2000, 8); // Canal 0, 2kHz, 8 bits
+  ledcAttachPin(BUZZER_PIN, 0);
 
   // Inicializa o I2C e o MPU6050
   Wire.begin(21, 22);  // SDA: 21, SCL: 22 para ESP32
-  lcd.begin(20, 4);
-  lcd.backlight();  // Garante que o backlight do LCD esteja ligado
-  lcd.print("LCD OK!");
-  delay(1000);
+
+  iniciar_lcd();
 
   mpu.initialize();
-  if (!mpu.testConnection()) {
-    Serial.println("MPU6050 nao conectado!");
-    while (1);
+  while (!mpu.testConnection()) {
+    print_lcd_and_serial("MPU6050 nao conectado!");
+    delay(1000);
   }
+
+  conectaWiFi();
+
 }
 
 void loop() {
 
+  if (!iniciou_sensor) {
+    iniciar_sensor();
+  }
+
+  JsonDocument doc;
+  doc["serial"] = chipidStr; // Adiciona o Chip ID ao JSON
+
   // Lê o valor do LDR
   int ldrValue = analogRead(LDR_PIN);
   int lux = map(ldrValue, 0, 4095, 0, 2000); 
+  doc["lux"] = lux; // Adiciona o valor de luminosidade ao JSON
 
   // Lê a temperatura do MPU6050
   int rawTemp = mpu.getTemperature();
   float tempC = rawTemp / 340.0 + 36.53;  //Converte o valor bruto para graus Celsius
-
+  doc["temperatura"] = tempC; // Adiciona a temperatura ao JSON
   // Exibe a temperatura e a condição claro/escuro no LCD e no Monitor Serial
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -68,13 +169,15 @@ void loop() {
   lcd.setCursor(0, 1);
   if (lux < 500) {
     lcd.print("Condicao: Escuro");
-    Serial.print(" Condição: Escuro |");
+    Serial.print(" Condição: Escuro");
+    Serial.print(" (Lux: " + String(lux) + ") |");
     digitalWrite(LED_PIN, LOW);
     digitalWrite(RELAY_PIN, LOW);
     noTone(BUZZER_PIN);
   } else {
     lcd.print("Condicao: Claro");
-    Serial.print(" Condição: Claro |");
+    Serial.print(" Condição: Claro");
+    Serial.print(" (Lux: " + String(lux) + ") |");
     for (int i = 0; i < 3; i++) { // Buzzer e LED piscam juntos por 3x
       digitalWrite(LED_PIN, HIGH);
       digitalWrite(RELAY_PIN, HIGH);
@@ -96,6 +199,9 @@ void loop() {
   float ax = ax_raw / 16384.0;
   float ay = ay_raw / 16384.0;
   float az = az_raw / 16384.0;
+  doc["acelerometro_x"] = ax; // Adiciona o valor de aceleração X ao JSON
+  doc["acelerometro_y"] = ay; // Adiciona o valor de aceleração Y ao JSON
+  doc["acelerometro_z"] = az; // Adiciona o valor de aceleração Z ao JSON
 
   // Lê os valores brutos de rotação
   int16_t gx_raw, gy_raw, gz_raw;
@@ -121,7 +227,8 @@ void loop() {
     delay(5); // pequeno intervalo para capturar vibrações rápidas
   }
 
- vibracaoMedia = somaVibracao / NUM_AMOSTRAS;
+  vibracaoMedia = somaVibracao / NUM_AMOSTRAS;
+  doc["vibracao_media"] = vibracaoMedia; // Adiciona a vibração média ao JSON
 
   Serial.print(" Vibracao media: ");
   Serial.print(vibracaoMedia, 2);
@@ -193,6 +300,16 @@ void loop() {
   Serial.print(ay, 2);
   Serial.print(" Z:");
   Serial.println(az, 2);
+
+  if (iniciou_sensor) {
+    // Envia os dados para a API
+    int httpcode = post_data(doc, post_sensor);
+    if (httpcode >= 200 && httpcode < 300) {
+      Serial.println("Dados enviados com sucesso!");
+    } else {
+      Serial.println("Falha ao enviar dados.");
+    }
+  }
 
   delay(5000);
 }

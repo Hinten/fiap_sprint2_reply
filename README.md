@@ -332,8 +332,6 @@ Esses gráficos são fundamentais para compreender o comportamento dos sensores,
 
 As tabelas com os dados utilizados no sistema podem ser encontradas na pasta em [assets/database_export.zip](assets/database_export.zip).
 
-O arquivo zip contém os arquivos no formato CSV, que podem ser importados para o banco de dados utilizando o dashboard, conforme passos abaixo.
-
 O Grupo disponibilizou uma base de dados inicial para facilitar o uso do sistema. Para importar essa base de dados, siga os passos abaixo:
 
 1. O usuário deve selecionar a opção "Importar Banco de Dados" no menu principal.

@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import List, Self, Union
+from typing import List, Self, Union, Any
 from datetime import datetime, date, time, timedelta
 
 from sqlalchemy import Sequence, String, ForeignKey, Float, DateTime, Enum
@@ -21,7 +21,7 @@ class TipoSensorEnum(StrEnum):
     def __str__(self):
         match self.value:
             case "L":
-                return "Lux"
+                return "Lux (x10³)"
             case "T":
                 return "Temperatura (°C)"
             case "V":
@@ -42,6 +42,18 @@ class TipoSensorEnum(StrEnum):
                 return 0, 3.0
 
         return 0, 100.0
+
+    def get_valor_escalado(self, valor) -> Any:
+        """
+        Retorna o valor escalado de acordo com o tipo do sensor.
+        :param valor: Valor a ser escalado.
+        :return: Valor escalado.
+        """
+        match self.value:
+            case "L":
+                return valor / 1000
+
+        return valor
 
 
 class TipoSensor(Model):

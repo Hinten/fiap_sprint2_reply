@@ -1,9 +1,10 @@
 import streamlit as st
+from src.dashboard.plots.analise_exploratoria import analise_exploratoria_view
 
 
 def _principal():
 
-    st.write("Página Principal")
+    analise_exploratoria_view()
 
 def get_principal_page() -> st.Page:
     """

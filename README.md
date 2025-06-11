@@ -373,7 +373,7 @@ Dentre os arquivos e pastas presentes na raiz do projeto, definem-se:
 ## 🗃 Histórico de versionamento
 
 * **0.2.0 - 11/06/2025** – README versão final  
-* **0.1.0 - 26/06/2025** – Versão preliminar da nossa aplicação
+* **0.1.0 - 23/05/2025** – Versão preliminar da nossa aplicação
 
 ## 📋 Licença
 

@@ -328,6 +328,30 @@ A análise exploratória dos dados coletados é realizada por meio do dashboard 
 
 Esses gráficos são fundamentais para compreender o comportamento dos sensores, identificar anomalias, padrões e possíveis relações entre as variáveis monitoradas. A interface do dashboard permite filtrar por datas e tipos de sensores, tornando a análise flexível e interativa.
 
+# 10. Importando a Base de dados utilizada pelo Grupo
+
+As tabelas com os dados utilizados no sistema podem ser encontradas na pasta em [assets/database_export.zip](assets/database_export.zip).
+
+O arquivo zip contém os arquivos no formato CSV, que podem ser importados para o banco de dados utilizando o dashboard, conforme passos abaixo.
+
+O Grupo disponibilizou uma base de dados inicial para facilitar o uso do sistema. Para importar essa base de dados, siga os passos abaixo:
+
+1. O usuário deve selecionar a opção "Importar Banco de Dados" no menu principal.
+<p align="center">
+  <img src="assets/dashboard/importar_banco_de_dados/importar_bd_1.JPG" alt="importar_db" border="0" width=80% height=80%>
+</p>
+
+2. Selecione o arquivo ZIP localizado em [assets/database_export.zip](assets/database_export.zip), espere carregar, role a página até o final e clique no botão "Salvar no Banco de Dados".
+<p align="center">
+  <img src="assets/dashboard/importar_banco_de_dados/importar_bd_2.JPG" alt="salvar_db" border="0" width=80% height=80%>
+</p>
+
+3. Não feche a janela e espere a operação ser concluída. Após a conclusão, o sistema irá exibir uma mensagem de sucesso. Caso ocorra algum erro, tente novamente.
+
+<p align="center">
+  <img src="assets/dashboard/importar_banco_de_dados/importar_bd_3.JPG" alt="salvar_db" border="0" width=80% height=80%>
+</p>
+
 
 ## 📁 Estrutura de pastas
 

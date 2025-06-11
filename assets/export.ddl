@@ -16,7 +16,7 @@ CREATE TABLE "SENSOR" (
 	nome VARCHAR(255), 
 	cod_serial VARCHAR(255), 
 	descricao VARCHAR(255), 
-	data_instalacao DATETIME, 
+	data_instalacao TIMESTAMP,
 	latitude FLOAT, 
 	longitude FLOAT, 
 	PRIMARY KEY (id), 
@@ -30,7 +30,7 @@ CREATE TABLE "SENSOR" (
 CREATE TABLE "LEITURA_SENSOR" (
 	id INTEGER NOT NULL, 
 	sensor_id INTEGER NOT NULL, 
-	data_leitura DATETIME NOT NULL, 
+	data_leitura TIMESTAMP NOT NULL,
 	valor FLOAT NOT NULL, 
 	PRIMARY KEY (id), 
 	FOREIGN KEY(sensor_id) REFERENCES "SENSOR" (id)

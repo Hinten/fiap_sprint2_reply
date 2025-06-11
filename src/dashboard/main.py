@@ -19,7 +19,7 @@ def main():
     configurar_logger("dashboard.log")
     st.set_page_config(layout="wide") # deixa a página mais larga
 
-    sql_lite:bool = os.environ.get("SQL_LITE", "false").lower() == "true"
+    sql_lite:bool = True
 
     if not st.session_state.get('logged_in', False):
         logging.debug('acessando login')

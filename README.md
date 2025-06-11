@@ -59,6 +59,8 @@ Esses sensores foram escolhidos por serem amplamente utilizados em ambientes ind
 
 # 5. Trechos Representativos do Código
 
+O código que controla o ESP32 pode ser encontrado no arquivo [src/wokwi/src/sketch.cpp](src/wokwi/src/sketch.cpp). A seguir, apresentamos trechos representativos do código que demonstram a leitura dos sensores, o envio dos dados para a API e o alerta de vibração.
+
 ### Leitura dos Sensores e Envio dos Dados
 
 ```cpp
@@ -157,11 +159,148 @@ No entanto, caso queira, a API pode ser executada separadamente executando o arq
 Explicações mais detalhadas sobre como iniciar o dashboard e variáveis de ambiente serão apresentadas na seção "Instalando e Executando o Projeto", a seguir neste mesmo README.md.
 
 # 7. Armazenamento de Dados em Banco SQL com Python
-fazer mer
+
+<p align="center">
+  <img src="assets/mer.png" alt="MER" border="0" width=70% height=70%>
+</p>
+
+Modelo de Entidade-Relacionamento:
+
+Tabela: TIPO_SENSOR
+  - id (INTEGER NOT NULL) [PK]
+  - nome (VARCHAR(255) NOT NULL)
+  - tipo (VARCHAR(15) NOT NULL)
+
+Tabela: SENSOR
+  - id (INTEGER NOT NULL) [PK]
+  - tipo_sensor_id (INTEGER NOT NULL) [FK -> TIPO_SENSOR]
+  - nome (VARCHAR(255))
+  - cod_serial (VARCHAR(255))
+  - descricao (VARCHAR(255))
+  - data_instalacao (DATETIME)
+  - latitude (FLOAT)
+  - longitude (FLOAT)
+
+Tabela: LEITURA_SENSOR
+  - id (INTEGER NOT NULL) [PK]
+  - sensor_id (INTEGER NOT NULL) [FK -> SENSOR]
+  - data_leitura (DATETIME NOT NULL)
+  - valor (FLOAT NOT NULL)
+
+Neste projeto, utilizamos um banco de dados SQLite para armazenar as leituras dos sensores. A estrutura do banco de dados é composta por três tabelas principais: `TIPO_SENSOR`, `SENSOR` e `LEITURA_SENSOR`.
+
+## Models e Python
+
+Para realizar a conversão das linhas e colunas da database para Python, foram definidas classes as quais são responsáveis por fazer as operações CRUD e demais funcionalidades do banco de dados.
+Essas classes podem ser encontradas na pasta `src/database/models`, e todas elas herdam a classe principal chamada [Model](src/database/tipos_base/model.py).
 
 # 8. Instalando e Executando o Projeto
 
-fazer parte instalando e executando o projeto
+O sistema foi desenvolvido em Python e utiliza um banco de dados SQLite para armazenar os dados. O código é modularizado, permitindo fácil manutenção e expansão.
+
+## 📦 Requisitos
+- Python 3.13.2
+- Bibliotecas:
+  - oracledb==3.1.0
+  - pandas==2.2.3
+  - matplotlib==3.10.1
+  - streamlit==1.44.1
+  - SQLAlchemy==2.0.40
+  - fastapi==0.115.12
+  - pydantic==2.11.5
+  - uvicorn==0.34.3
+  - dotenv==0.9.9
+  - seaborn==0.13.2
+  - plotly==6.1.2
+
+## 📂 Instalação
+
+- Instale as dependências utilizando o arquivo requirements.txt:
+    ```bash
+    pip install -r requirements.txt
+    ```
+  
+- Para iniciar o dashboard interativo, execute o seguinte comando no terminal:
+    ```bash
+    streamlit run main_dash.py
+    ```
+
+## Arquivo de Configuração
+
+O projeto utiliza um arquivo especial denominado **`.env`** para armazenar variáveis de ambiente sensíveis, como credenciais de banco de dados e chaves de APIs externas. Por razões de segurança, esse arquivo **não deve ser compartilhado publicamente**.
+
+### 📄 O que é o `.env`?
+
+O `.env` é um arquivo-texto simples, onde cada linha define uma variável de ambiente no formato `NOME_VARIAVEL=valor`. Esse método permite separar informações confidenciais do código-fonte, facilitando a configuração do sistema para diferentes ambientes (desenvolvimento, testes, produção, etc).
+
+### 🔑 Variáveis Utilizadas
+
+| Variável      | Descrição                                                                                                | Exemplo de Valor                  |
+|---------------|----------------------------------------------------------------------------------------------------------|-----------------------------------|
+| LOGGING_ENABLED      | Define se o logger da aplicação será ativado (`true` ou `false`)                                         | `true` ou `false`                 |
+| ENABLE_API      | Define se a API que salva os dados do sensor será ativada juntamente com o dashboard (`true` ou `false`) | `true` ou `false`                 |
+
+### ⚙️ Exemplo de arquivo `.env`
+
+```plaintext
+LOGGING_ENABLED=true
+ENABLE_API=true
+```
+  
+Ao iniciar o Dashboard, o usuário será direcionado para a interface do Streamlit, onde poderá visualizar os dados coletados pelos sensores e interagir com os gráficos gerados.
+A página pricipal do dashboard exibe uma exploração de dados, a qual pode ser filtrada por data de leitura.
+
+
+<p align="center">
+  <img src="assets/dashboard/principal/principal_1.JPG" alt="principal_1" border="0" width=70% height=70%>
+</p>
+<p align="center">
+  <img src="assets/dashboard/principal/principal_2.JPG" alt="principal_2" border="0" width=70% height=70%>
+</p>
+<p align="center">
+  <img src="assets/dashboard/principal/principal_3.JPG" alt="principal_3" border="0" width=70% height=70%>
+</p>
+<p align="center">
+  <img src="assets/dashboard/principal/principal_4.JPG" alt="principal_4" border="0" width=70% height=70%>
+</p>
+<p align="center">
+  <img src="assets/dashboard/principal/principal_5.JPG" alt="principal_5" border="0" width=70% height=70%>
+</p>
+<p align="center">
+  <img src="assets/dashboard/principal/principal_6.JPG" alt="principal_6" border="0" width=70% height=70%>
+</p>
+
+O Dashboard também permite realizar operações CRUD. A seguir, um exemplo de como cadastrar uma nova leitura de sensor:
+
+Clique em "Leituras de Sensores" no menu lateral e posteriormente em "Novo".
+
+<p align="center">
+  <img src="assets/dashboard/exemplo_cadastro/exemplo_cadastro_1.JPG" alt="exemplo_cadastro_1" border="0" width=70% height=70%>
+</p>
+
+Preencha os campos necessários e clique em "Salvar".
+
+<p align="center">
+  <img src="assets/dashboard/exemplo_cadastro/exemplo_cadastro_2.JPG" alt="exemplo_cadastro_2" border="0" width=70% height=70%>
+</p>
+
+Uma mensagem de sucesso será exibida, confirmando que a leitura foi cadastrada com sucesso.
+
+
+<p align="center">
+  <img src="assets/dashboard/exemplo_cadastro/exemplo_cadastro_3.JPG" alt="exemplo_cadastro_3" border="0" width=70% height=70%>
+</p>
+
+Caso necessário o usuário pode editar ou excluir uma leitura existente. Basta selecionar a linha desejada e clicar no botão "Editar". Para excluir é só clicar no botão "Excluir" dentro da tela de edição.
+
+<p align="center">
+  <img src="assets/dashboard/exemplo_cadastro/exemplo_cadastro_4.JPG" alt="exemplo_cadastro_4" border="0" width=70% height=70%>
+</p>
+
+<p align="center">
+  <img src="assets/dashboard/exemplo_cadastro/exemplo_cadastro_5.JPG" alt="exemplo_cadastro_5" border="0" width=70% height=70%>
+</p>
+
 
 # 9. Gráficos e Insights Iniciais
 
